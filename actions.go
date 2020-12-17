@@ -20,7 +20,6 @@ package githubactions
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 )
@@ -96,8 +95,13 @@ func (c *Action) issueFileCommand(cmd *Command, f getenvFunc) error {
 	e = strings.ToUpper(e)
 	e = "GITHUB_" + e
 
-	err := ioutil.WriteFile(f(e), []byte(cmd.Message+"\n"), os.ModeAppend)
+	file, err := os.OpenFile(f(e), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		return (err)
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(cmd.Message + "\n"); err != nil {
 		return fmt.Errorf(errFileCmdFmt, err)
 	}
 
@@ -153,6 +157,7 @@ func (c *Action) addPath(p string, f getenvFunc) {
 	}, f)
 
 	if err != nil { // use regular command as fallback
+		c.Warningf("Unable to use Environment Files: %v", err)
 		// ::add-path::<p>
 		c.IssueCommand(&Command{
 			Name:    addPathCmd,
@@ -275,7 +280,7 @@ func (c *Action) Fatalf(msg string, args ...interface{}) {
 // Infof prints a info-level message. The arguments follow the standard Printf
 // arguments.
 func (c *Action) Infof(msg string, args ...interface{}) {
-	// ::info <c.fields>::<msg, args>
+	// <msg, args>
 	fmt.Fprintln(c.w, msg, args)
 }
 
